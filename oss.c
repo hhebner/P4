@@ -67,16 +67,16 @@ int main(int argc, char* argv[]) {
                         exit(EXIT_SUCCESS);
                         break;
                    case 'n':
-                        nValue = atoi(optarg);
+                        n = atoi(optarg);
                         break;
                    case 's':
-                        sValue = atoi(optarg);
+                        s = atoi(optarg);
                         break;
                    case 't':
-                        tValue = atoi(optarg);
+                        t = atoi(optarg);
                         break;
                    case 'f':
-                        fValue = optarg;
+                        f = optarg;
                         break;
                    default:  // option not recognized
                         fprintf(stderr, "Usage: %s [-h] [-n proc] [-s simul] [-t timeToLaunchNewChild] [-f logfile]\n", argv[0]);
