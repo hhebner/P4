@@ -132,21 +132,24 @@ int main(int argc, char* argv[]) {
                         exit(EXIT_FAILURE);
                 } else if (fork_pid == 0) {
                         pct[index].pid = getpid();
-                        printf("Process PID: %d\n", pct[index].pid);
+                        char msg_id_str[20];
+                        sprintf(msg_id_str, "%d", msgid);
 
-                        int rcv_status = msgrcv(msgid, &msg, sizeof(msg), 1, 0);
-                        if (rcv_status == -1) {
-                                perror("msgrcv failed");
-                        } else {
-                                printf("User process Recieved: %s\n", msg.mtext);
-                        }
-                        exit(0);
+                        execl("./worker", "./worker", msg_id_str, NULL);
                 } else {
                         sleep(1);
                         msg.mtype = 1;
                         strcpy(msg.mtext, "Message from Master");
                         msgsnd(msgid, &msg, sizeof(msg), 0);
                         printf("Master sent: %s\n", msg.mtext);
+
+                        int rcv_status = msgrcv(msgid, &msg, sizeof(msg), 2, 0);
+                        if (rcv_status == -1) {
+                                perror("msgrcv failed");
+                        } else {
+                                printf("Master received: %s\n", msg.mtext);
+                        }
+
                 }
         }
 
