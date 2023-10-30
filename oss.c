@@ -52,6 +52,11 @@ int allocatePCB() {
         }
         return -1;
 }
+
+void printSysClock(SysClock *clock) {
+    printf("Clock time: %u seconds and %u nanoseconds\n", clock->seconds, clock->nano_seconds);
+}
+
 int main(int argc, char* argv[]) {
         int opt;
         int n = 1;
@@ -78,7 +83,7 @@ int main(int argc, char* argv[]) {
                    case 'f':
                         f = optarg;
                         break;
-                   default:  // option not recognized
+                   default:
                         fprintf(stderr, "Usage: %s [-h] [-n proc] [-s simul] [-t timeToLaunchNewChild] [-f logfile]\n", argv[0]);
                         exit(EXIT_FAILURE);
                         break;
@@ -86,7 +91,7 @@ int main(int argc, char* argv[]) {
         }
 
 
-        printf("-n value = %d\n", n;
+        printf("-n value = %d\n", n);
         printf("-s value = %d\n", s);
         printf("-t value = %d\n", t);
         printf("-f value = %s\n", f);
@@ -116,42 +121,53 @@ int main(int argc, char* argv[]) {
         shm_clock->nano_seconds = 0;
 
         pid_t fork_pid;
+        int total_workers_launched = 0;
+        int active_workers = 0;
+        SysClock next_launchT = {0, t};
 
-        for (int i = 0; i < 20; i++) {
-                int index = allocatePCB();
-                if (index == -1) {
-                        printf("No space available in PCB\n");
-                        break;
-                }
+         while (total_workers_launched < n) {
+              // Increment the shared clock
+              incrementClock(shm_clock, 0, 10);
+             // printSysClock(shm_clock);
 
+              if (shm_clock->seconds > next_launchT.seconds || (shm_clock->seconds == next_launchT.seconds && shm_clock->nano_seconds >= next_launchT.nano_seconds)) {
 
-                fork_pid = fork();
+                if (active_workers < s) {
+                        int index = allocatePCB();
+                        if (index != -1) {
+                                fork_pid = fork();
 
-                if (fork_pid < 0) {
-                        perror("Fork failed");
-                        exit(EXIT_FAILURE);
-                } else if (fork_pid == 0) {
-                        pct[index].pid = getpid();
-                        char msg_id_str[20];
-                        sprintf(msg_id_str, "%d", msgid);
+                                if (fork_pid < 0) {
+                                        perror("Fork failed");
+                                        exit(EXIT_FAILURE);
+                                } else if (fork_pid == 0) {
+                                        pct[index].pid = getpid();
+                                        char msg_id_str[20];
+                                        sprintf(msg_id_str, "%d", msgid);
 
-                        execl("./worker", "./worker", msg_id_str, NULL);
-                } else {
-                        sleep(1);
-                        msg.mtype = 1;
-                        strcpy(msg.mtext, "Message from Master");
-                        msgsnd(msgid, &msg, sizeof(msg), 0);
-                        printf("Master sent: %s\n", msg.mtext);
+                                        execl("./worker", "./worker", msg_id_str, NULL);
+                                } else {
+                                        active_workers++;
+                                        total_workers_launched++;
+                                        incrementClock(&next_launchT, 0, t);
 
-                        int rcv_status = msgrcv(msgid, &msg, sizeof(msg), 2, 0);
-                        if (rcv_status == -1) {
-                                perror("msgrcv failed");
-                        } else {
-                                printf("Master received: %s\n", msg.mtext);
+                                        msg.mtype = 1;
+                                        strcpy(msg.mtext, "Message from Master");
+                                        msgsnd(msgid, &msg, sizeof(msg), 0);
+                                        printf("Master sent: %s\n", msg.mtext);
+
+                                        int rcv_status = msgrcv(msgid, &msg, sizeof(msg), 2, 0);
+                                        if (rcv_status == -1) {
+                                                perror("msgrcv failed");
+                                        } else {
+                                                printf("Master received: %s\n", msg.mtext);
+                                                active_workers--;  // Assuming child will exit after sending the message.
                         }
-
+                    }
                 }
+            }
         }
+    }
 
         for (int i = 0; i < 20; i++) {
                 if (pct[i].occupied == 1) {
@@ -174,5 +190,5 @@ int main(int argc, char* argv[]) {
                 exit(1);
         }
 
-         return 0;
+        return 0;
 }
